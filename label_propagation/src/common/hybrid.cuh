@@ -22,7 +22,7 @@ public:
     using typename LabelPropagator<V, E>::GraphT;
 
     HybridLP(std::shared_ptr<GraphT> _G, int bs)
-        : S(_G, bs), OutOfCore<V, E>(G, bs), cpu_worker(G, this->bbs, tql, qlock, this->labels.get()) { }
+        : S(_G), OutOfCore<V, E>(G, bs), cpu_worker(G, this->bbs, tql, qlock, this->labels.get()) { }
     HybridLP(std::shared_ptr<GraphT> _G, int p, int bs)
         : S(_G, p), OutOfCore<V, E>(G, bs), cpu_worker(G, this->bbs, tql, qlock, this->labels.get()) { }
     virtual ~HybridLP() = default;

@@ -16,7 +16,7 @@ class DPPBase: public LabelPropagator<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    DPPBase(std::shared_ptr<GraphT> _G, int sr_buf=0, bool nalb=true);
+    DPPBase(std::shared_ptr<GraphT> _G, bool nalb=true);
     virtual ~DPPBase();
 
     std::pair<double, double> run(int niter);
@@ -49,16 +49,15 @@ protected:
     int *d_counter;        // 1
 
     mgpu::ContextPtr context;  // Used for segmented sort and scan
-    SegmentedReducer reducer;
+    SegmentedReducer *reducer;
 
     bool no_adj_labels_buf; // Don't allocate d_adj_labels if true
 };
 
 
 template<typename V, typename E>
-DPPBase<V, E>::DPPBase(std::shared_ptr<GraphT> _G, int sr_buf, bool nalb)
-    : LabelPropagator<V, E>(_G), context(mgpu::CreateCudaDeviceStream(0)),
-    reducer(sr_buf > 0 ? sr_buf : _G->m, context->Stream()), no_adj_labels_buf(nalb)
+DPPBase<V, E>::DPPBase(std::shared_ptr<GraphT> _G, bool nalb)
+    : LabelPropagator<V, E>(_G), context(mgpu::CreateCudaDeviceStream(0)), no_adj_labels_buf(nalb)
 {
     cudaHostRegister((void *) &G->neighbors[0], sizeof(V) * G->m, cudaHostRegisterMapped);
     cudaHostRegister((void *) &G->offsets[0], sizeof(E) * (G->n + 1), cudaHostRegisterMapped);
@@ -149,7 +148,7 @@ void DPPBase<V, E>::perform_lp(int n, int m, int lbl_offset, int *pinned_hmem, c
         cudaMemcpy(&N, d_segments + n, sizeof(int), cudaMemcpyDeviceToHost);
     }
 
-    reducer.apply(d_label_weights, N, d_segments, n, d_tmp1, d_tmp_labels);
+    reducer->apply(d_label_weights, N, d_segments, n, d_tmp1, d_tmp_labels);
 
     update_labels<<<n_blocks, nthreads, 0, stream>>>
         (d_adj_labels, d_tmp2, d_tmp_labels, n, d_labels + lbl_offset, d_counter);
@@ -186,6 +185,8 @@ void DPPBase<V, E>::init_gmem(V n, int m)
     cudaMalloc(&d_tmp_labels,     sizeof(int) * n);
     cudaMalloc(&d_counter,        sizeof(int) * 1);
 
+    reducer = new SegmentedReducer(m, context->Stream());
+
     cudaMemset(d_counter, 0, sizeof(int));
 }
 
@@ -205,4 +206,6 @@ void DPPBase<V, E>::free_gmem()
     cudaFree(d_label_weights);
     cudaFree(d_tmp_labels);
     cudaFree(d_counter);
+
+    delete reducer;
 }

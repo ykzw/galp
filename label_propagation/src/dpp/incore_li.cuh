@@ -12,7 +12,7 @@ class InCoreLIDPP: public DPPBase<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    InCoreLIDPP(std::shared_ptr<GraphT> _G): DPPBase<V, E>(_G) { }
+    InCoreLIDPP(std::shared_ptr<GraphT> _G): DPPBase<V, E>(_G, false) { }
     virtual ~InCoreLIDPP() = default;
 
 

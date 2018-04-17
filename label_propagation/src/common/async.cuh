@@ -13,7 +13,7 @@ public:
     using typename LabelPropagator<V, E>::GraphT;
 
     AsyncLP(std::shared_ptr<GraphT> _G, int bs)
-        : S(_G, bs), OutOfCore<V, E>(_G, bs) { }
+        : S(_G), OutOfCore<V, E>(_G, bs) { }
     AsyncLP(std::shared_ptr<GraphT> _G, int p, int bs)
         : S(_G, p), OutOfCore<V, E>(_G, bs) { }
     virtual ~AsyncLP() = default;

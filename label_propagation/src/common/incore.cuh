@@ -12,7 +12,7 @@ class InCoreLP: public S {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    InCoreLP(std::shared_ptr<GraphT> _G): S(_G, _G->m, false) { }
+    InCoreLP(std::shared_ptr<GraphT> _G): S(_G, false) { }
     InCoreLP(std::shared_ptr<GraphT> _G, int p): S(_G, p, false) { }
     virtual ~InCoreLP() = default;
 
