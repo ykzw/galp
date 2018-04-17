@@ -2,17 +2,19 @@
 
 #pragma once
 
-#include "dpp.cuh"
+#include "graph.h"
+#include "label_propagator.h"
 
 
-// GPU in-core, data-parallel primitives based label propagation
-template<typename V, typename E>
-class InCoreDPP: public DPP<V, E> {
+// GPU in-core, lock-free hash table based label propagation
+template<typename V, typename E, typename S>
+class InCoreLP: public S {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    InCoreDPP(std::shared_ptr<GraphT> _G): DPP<V, E>(_G) { }
-    virtual ~InCoreDPP() = default;
+    InCoreLP(std::shared_ptr<GraphT> _G): S(_G, _G->m, false) { }
+    InCoreLP(std::shared_ptr<GraphT> _G, int p): S(_G, p, false) { }
+    virtual ~InCoreLP() = default;
 
 
 protected:
@@ -24,21 +26,21 @@ protected:
     void transfer_data();
 
     // Attributes
-    using LabelPropagator<V, E>::G;  // To avoid many "this->"es
+    using LabelPropagator<V, E>::G;
 
 };
 
 
-template<typename V, typename E>
-void InCoreDPP<V, E>::preprocess()
+template<typename V, typename E, typename S>
+void InCoreLP<V, E, S>::preprocess()
 {
     this->init_gmem(G->n, G->m);
     transfer_data();
 }
 
 
-template<typename V, typename E>
-int InCoreDPP<V, E>::iterate(int i)
+template<typename V, typename E, typename S>
+int InCoreLP<V, E, S>::iterate(int i)
 {
     this->perform_lp(G->n, G->m);
 
@@ -47,15 +49,15 @@ int InCoreDPP<V, E>::iterate(int i)
 }
 
 
-template<typename V, typename E>
-void InCoreDPP<V, E>::postprocess()
+template<typename V, typename E, typename S>
+void InCoreLP<V, E, S>::postprocess()
 {
     this->free_gmem();
 }
 
 
-template<typename V, typename E>
-void InCoreDPP<V, E>::transfer_data()
+template<typename V, typename E, typename S>
+void InCoreLP<V, E, S>::transfer_data()
 {
     cudaMemcpy(this->d_neighbors, &G->neighbors[0], sizeof(V) * G->m, cudaMemcpyHostToDevice);
 

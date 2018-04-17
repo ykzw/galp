@@ -6,9 +6,7 @@
 #include <algorithm>
 #include "omp.h"
 
-#include "dpp.cuh"
-#include "incore.cuh"
-#include "../common/outofcore.cuh"
+#include "outofcore.cuh"
 #include "hybrid_cpu_worker.cuh"
 
 
@@ -18,14 +16,16 @@ using TaskQueueList = std::vector<TaskQueue>;
 
 
 // CPU--GPU hybrid, GPU out-of-core with overlap, data-parallel primitives based label propagation
-template<typename V, typename E>
-class HybridDPP: public DPP<V, E>, public OutOfCore<V, E> {
+template<typename V, typename E, typename S>
+class HybridLP: public S, public OutOfCore<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    HybridDPP(std::shared_ptr<GraphT> _G, int bs)
-        : DPP<V, E>(_G, (1 << bs), true), OutOfCore<V, E>(G, bs), cpu_worker(G, this->bbs, tql, qlock, this->labels.get()) { }
-    virtual ~HybridDPP() = default;
+    HybridLP(std::shared_ptr<GraphT> _G, int bs)
+        : S(_G, bs), OutOfCore<V, E>(G, bs), cpu_worker(G, this->bbs, tql, qlock, this->labels.get()) { }
+    HybridLP(std::shared_ptr<GraphT> _G, int p, int bs)
+        : S(_G, p), OutOfCore<V, E>(G, bs), cpu_worker(G, this->bbs, tql, qlock, this->labels.get()) { }
+    virtual ~HybridLP() = default;
 
     std::pair<double, double> run(int niter);
 
@@ -62,18 +62,18 @@ private:
 };
 
 
-template<typename V, typename E>
-std::pair<double, double> HybridDPP<V, E>::run(int niter)
+template<typename V, typename E, typename S>
+std::pair<double, double> HybridLP<V, E, S>::run(int niter)
 {
     this->compute_batch_boundaries();
     make_task_queue_list(niter);
 
-    return DPP<V, E>::run(niter);
+    return S::run(niter);
 }
 
 
-template<typename V, typename E>
-void HybridDPP<V, E>::preprocess()
+template<typename V, typename E, typename S>
+void HybridLP<V, E, S>::preprocess()
 {
     this->init_gmem(G->n, this->B);
     cpu_worker.d_labels = this->d_labels;
@@ -87,8 +87,8 @@ void HybridDPP<V, E>::preprocess()
 }
 
 
-template<typename V, typename E>
-int HybridDPP<V, E>::iterate(int i)
+template<typename V, typename E, typename S>
+int HybridLP<V, E, S>::iterate(int i)
 {
     int count = 0;
 
@@ -116,8 +116,8 @@ int HybridDPP<V, E>::iterate(int i)
 }
 
 
-template<typename V, typename E>
-void HybridDPP<V, E>::postprocess()
+template<typename V, typename E, typename S>
+void HybridLP<V, E, S>::postprocess()
 {
     free_gmem();
 
@@ -130,8 +130,8 @@ void HybridDPP<V, E>::postprocess()
 }
 
 
-template<typename V, typename E>
-int HybridDPP<V, E>::gpu_work(int i)
+template<typename V, typename E, typename S>
+int HybridLP<V, E, S>::gpu_work(int i)
 {
     Timer gput; gput.start();
     int npb = 0;
@@ -159,8 +159,8 @@ int HybridDPP<V, E>::gpu_work(int i)
             this->transfer_batch(next, d_neighbors_buf, d_offsets_buf, stream2);
         }
 
-        this->perform_lp(batch_n, batch_m, this->bbs[task], stream1, &this->h_norm_offsets[G->n + 1]);
-        cudaStreamSynchronize(stream2);
+        this->perform_lp(batch_n, batch_m, this->bbs[task], &this->h_norm_offsets[G->n + 1], stream1);
+        cudaDeviceSynchronize();
 
         swap_buffers();
 
@@ -178,8 +178,8 @@ int HybridDPP<V, E>::gpu_work(int i)
 }
 
 
-template<typename V, typename E>
-std::pair<Task, Task> HybridDPP<V, E>::get_new_GPU_tasks(int i)
+template<typename V, typename E, typename S>
+std::pair<Task, Task> HybridLP<V, E, S>::get_new_GPU_tasks(int i)
 {
     int cur, next;
 
@@ -201,8 +201,8 @@ std::pair<Task, Task> HybridDPP<V, E>::get_new_GPU_tasks(int i)
 }
 
 
-template<typename V, typename E>
-void HybridDPP<V, E>::make_task_queue_list(int niter)
+template<typename V, typename E, typename S>
+void HybridLP<V, E, S>::make_task_queue_list(int niter)
 {
     tql.clear();
     tql.resize(niter + 1);
@@ -225,8 +225,8 @@ void HybridDPP<V, E>::make_task_queue_list(int niter)
 }
 
 
-template<typename V, typename E>
-void HybridDPP<V, E>::swap_buffers()
+template<typename V, typename E, typename S>
+void HybridLP<V, E, S>::swap_buffers()
 {
     std::swap(this->d_neighbors, d_neighbors_buf);
     this->d_adj_labels = this->d_neighbors;
@@ -234,21 +234,21 @@ void HybridDPP<V, E>::swap_buffers()
 }
 
 
-template<typename V, typename E>
-void HybridDPP<V, E>::init_gmem(int n, int B)
+template<typename V, typename E, typename S>
+void HybridLP<V, E, S>::init_gmem(int n, int B)
 {
     cudaMalloc(&d_neighbors_buf, sizeof(int) * B);
     cudaMalloc(&d_offsets_buf, sizeof(int) * (n + 1));
 
-    DPP<V, E>::init_gmem(n, B);
+    S::init_gmem(n, B);
 }
 
 
-template<typename V, typename E>
-void HybridDPP<V, E>::free_gmem()
+template<typename V, typename E, typename S>
+void HybridLP<V, E, S>::free_gmem()
 {
     cudaFree(d_neighbors_buf);
     cudaFree(d_offsets_buf);
 
-    DPP<V, E>::free_gmem();
+    S::free_gmem();
 }

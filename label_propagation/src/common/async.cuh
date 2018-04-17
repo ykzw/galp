@@ -2,20 +2,21 @@
 
 #pragma once
 
-#include "dpp.cuh"
-#include "incore.cuh"
-#include "../common/outofcore.cuh"
+#include "graph.h"
+#include "outofcore.cuh"
 
 
 // GPU out-of-core with overlap, data-parallel primitives based label propagation
-template<typename V, typename E>
-class AsyncDPP: public DPP<V, E>, public OutOfCore<V, E> {
+template<typename V, typename E, typename S>
+class AsyncLP: public S, public OutOfCore<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    AsyncDPP(std::shared_ptr<GraphT> _G, int bs)
-        : DPP<V, E>(_G, (1 << bs), true), OutOfCore<V, E>(_G, bs) { }
-    virtual ~AsyncDPP() = default;
+    AsyncLP(std::shared_ptr<GraphT> _G, int bs)
+        : S(_G, bs), OutOfCore<V, E>(_G, bs) { }
+    AsyncLP(std::shared_ptr<GraphT> _G, int p, int bs)
+        : S(_G, p), OutOfCore<V, E>(_G, bs) { }
+    virtual ~AsyncLP() = default;
 
 
 private:
@@ -30,7 +31,7 @@ private:
     void free_gmem();
 
     // Attributes
-    using LabelPropagator<V, E>::G;  // To avoid many "this->"es
+    using LabelPropagator<V, E>::G;
 
     // For double buffering
     int *d_neighbors_buf;  // B
@@ -42,8 +43,8 @@ private:
 };
 
 
-template<typename V, typename E>
-void AsyncDPP<V, E>::preprocess()
+template<typename V, typename E, typename S>
+void AsyncLP<V, E, S>::preprocess()
 {
     init_gmem(G->n, this->B);
 
@@ -54,8 +55,8 @@ void AsyncDPP<V, E>::preprocess()
 }
 
 
-template<typename V, typename E>
-int AsyncDPP<V, E>::iterate(int i)
+template<typename V, typename E, typename S>
+int AsyncLP<V, E, S>::iterate(int i)
 {
     if (i == 0) {
         // The first batch
@@ -70,8 +71,8 @@ int AsyncDPP<V, E>::iterate(int i)
 
         this->transfer_next_batch(j, d_neighbors_buf, d_offsets_buf, stream2);
 
-        this->perform_lp(batch_n, batch_m, this->bbs[j], stream1, &this->h_norm_offsets[G->n + 1]);
-        cudaStreamSynchronize(stream2);
+        this->perform_lp(batch_n, batch_m, this->bbs[j], &this->h_norm_offsets[G->n + 1], stream1);
+        cudaDeviceSynchronize();
 
         swap_buffers();
     }
@@ -81,8 +82,8 @@ int AsyncDPP<V, E>::iterate(int i)
 }
 
 
-template<typename V, typename E>
-void AsyncDPP<V, E>::postprocess()
+template<typename V, typename E, typename S>
+void AsyncLP<V, E, S>::postprocess()
 {
     free_gmem();
 
@@ -91,8 +92,8 @@ void AsyncDPP<V, E>::postprocess()
 }
 
 
-template<typename V, typename E>
-void AsyncDPP<V, E>::swap_buffers()
+template<typename V, typename E, typename S>
+void AsyncLP<V, E, S>::swap_buffers()
 {
     std::swap(this->d_neighbors, d_neighbors_buf);
     this->d_adj_labels = this->d_neighbors;
@@ -100,21 +101,21 @@ void AsyncDPP<V, E>::swap_buffers()
 }
 
 
-template<typename V, typename E>
-void AsyncDPP<V, E>::init_gmem(int n, int B)
+template<typename V, typename E, typename S>
+void AsyncLP<V, E, S>::init_gmem(int n, int B)
 {
     cudaMalloc(&d_neighbors_buf, sizeof(int) * B);
     cudaMalloc(&d_offsets_buf, sizeof(int) * (n + 1));
 
-    DPP<V, E>::init_gmem(n, B);
+    S::init_gmem(n, B);
 }
 
 
-template<typename V, typename E>
-void AsyncDPP<V, E>::free_gmem()
+template<typename V, typename E, typename S>
+void AsyncLP<V, E, S>::free_gmem()
 {
     cudaFree(d_neighbors_buf);
     cudaFree(d_offsets_buf);
 
-    DPP<V, E>::free_gmem();
+    S::free_gmem();
 }

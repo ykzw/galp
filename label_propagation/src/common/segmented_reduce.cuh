@@ -565,6 +565,7 @@ struct SegmentedReducer {
     static constexpr int ET = 17;       // Elements per thread
     static constexpr int EB = TB * ET;  // Elements per block
 
+    SegmentedReducer() { }
     SegmentedReducer(int N, cudaStream_t s=0): stream(s) {
         int num_tiles = (N + EB - 1) / EB;
         int num_tiles2 = (num_tiles + TB - 1) / TB;
@@ -579,11 +580,11 @@ struct SegmentedReducer {
     }
 
     ~SegmentedReducer() {
-        cudaFree(partitions);
-        cudaFree(carry_outs);
-        cudaFree(satellite_carry_outs);
-        cudaFree(carry_outs2);
-        cudaFree(satellite_carry_outs2);
+        if (partitions) cudaFree(partitions);
+        if (carry_outs) cudaFree(carry_outs);
+        if (satellite_carry_outs) cudaFree(satellite_carry_outs);
+        if (carry_outs2) cudaFree(carry_outs2);
+        if (satellite_carry_outs2) cudaFree(satellite_carry_outs2);
     }
 
     void apply(int *data, int N, int *ptr, int M, int *dst, int *satellite_dst) {

@@ -2,20 +2,20 @@
 
 #pragma once
 
-#include "dpp.cuh"
-#include "incore.cuh"
-#include "../common/outofcore.cuh"
+#include "graph.h"
+#include "outofcore.cuh"
 
 
-// GPU out-of-core without overlap, data-parallel primitives based label propagation
-template<typename V, typename E>
-class SyncDPP: public DPP<V, E>, public OutOfCore<V, E> {
+template<typename V, typename E, typename S>
+class SyncLP: public S, public OutOfCore<V, E> {
 public:
-    using typename LabelPropagator<V, E>::GraphT;
+    using typename OutOfCore<V, E>::GraphT;
 
-    SyncDPP(std::shared_ptr<GraphT> _G, int bs)
-        : DPP<V, E>(_G, (1 << bs), true), OutOfCore<V, E>(G, bs) { }
-    virtual ~SyncDPP() = default;
+    SyncLP(std::shared_ptr<GraphT> _G, int bs)
+        : S(_G, bs), OutOfCore<V, E>(_G, bs) { }
+    SyncLP(std::shared_ptr<GraphT> _G, int p, int bs)
+        : S(_G, p), OutOfCore<V, E>(_G, bs) { }
+    virtual ~SyncLP() = default;
 
 
 private:
@@ -25,20 +25,21 @@ private:
     void postprocess();
 
     // Attributes
-    using LabelPropagator<V, E>::G;  // To avoid many "this->"es
+    using LabelPropagator<V, E>::G;
+
 };
 
 
-template<typename V, typename E>
-void SyncDPP<V, E>::preprocess()
+template<typename V, typename E, typename S>
+void SyncLP<V, E, S>::preprocess()
 {
     this->init_gmem(G->n, this->B);
     this->compute_batch_boundaries();
 }
 
 
-template<typename V, typename E>
-int SyncDPP<V, E>::iterate(int i)
+template<typename V, typename E, typename S>
+int SyncLP<V, E, S>::iterate(int i)
 {
     int nbatches = this->get_num_batches();
     for (auto j: range(nbatches)) {
@@ -57,8 +58,8 @@ int SyncDPP<V, E>::iterate(int i)
 }
 
 
-template<typename V, typename E>
-void SyncDPP<V, E>::postprocess()
+template<typename V, typename E, typename S>
+void SyncLP<V, E, S>::postprocess()
 {
     this->free_gmem();
 }

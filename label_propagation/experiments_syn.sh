@@ -14,33 +14,37 @@ PREFIX=../../graph_clustering_orig/lfr/binary_networks/datasets
 IMPLS=(Async Sync LI Hybrid AsyncLFHT)
 
 for p in 4; do
-    impl=${IMPLS[$p]}
-    if [ $p -eq 1 ]; then
-        p=0
-        B=20
-    elif [ $p -eq 4 ]; then
-        B=20
-    else
-        B=30
-    fi
+    for q in 0 1 2 3; do
+# for p in 0; do
+#     for q in 0; do
+        impl=${IMPLS[$p]}
+        if [ $p -eq 1 ]; then
+            p=0
+            B=20
+        elif [ $p -eq 4 ]; then
+            B=20
+        else
+            B=20
+        fi
 
-    for n in `seq 1 10`; do
-        identifier=_${n}00000_20_${n}000_${mu}
-        D=${PREFIX}/normalized_network${identifier}.dat
-        C=${PREFIX}/normalized_community${identifier}.dat
-        for i in `seq 1`; do
-            echo -e "`date`\t${impl}\tn_LFR${identifier}\t${i}"
-            bin/label_propagation $p $D 10 $B $C > /dev/null 2>> result_lfr.csv
+        for n in `seq 1 10`; do
+            identifier=_${n}00000_20_${n}000_${mu}
+            D=${PREFIX}/normalized_network${identifier}.dat
+            C=${PREFIX}/normalized_community${identifier}.dat
+            for i in `seq 1`; do
+                echo -e "`date`\t${impl}${q}\tn_LFR${identifier}\t${i}"
+                bin/label_propagation $p $q $D 10 $B $C > /dev/null 2>> result_lfr.csv
+            done
         done
-    done
 
-    for n in `seq 1 10`; do
-        identifier=_${n}00000_20_${n}000_${mu}
-        D=${PREFIX}/randomized_network${identifier}.dat
-        C=${PREFIX}/randomized_community${identifier}.dat
-        for i in `seq 1`; do
-            echo -e "`date`\t${impl}\tr_LFR${identifier}\t${i}"
-            bin/label_propagation $p $D 10 $B $C > /dev/null 2>> result_lfr.csv
-        done
+        # for n in `seq 1 10`; do
+        #     identifier=_${n}00000_20_${n}000_${mu}
+        #     D=${PREFIX}/randomized_network${identifier}.dat
+        #     C=${PREFIX}/randomized_community${identifier}.dat
+        #     for i in `seq 1`; do
+        #         echo -e "`date`\t${impl}\tr_LFR${identifier}\t${i}"
+        #         bin/label_propagation $p $D 10 $B $C > /dev/null 2>> result_lfr.csv
+        #     done
+        # done
     done
 done

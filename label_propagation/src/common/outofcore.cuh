@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "graph.h"
+
 
 // Out-of-core in the sense that the data does not fit into the GPU, but it fits into the CPU main memory
 template<typename V, typename E>

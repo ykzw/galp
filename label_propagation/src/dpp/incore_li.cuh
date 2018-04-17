@@ -8,11 +8,11 @@
 
 // GPU in-core with load imbalance, data-parallel primitives based label propagation
 template<typename V, typename E>
-class InCoreLIDPP: public DPP<V, E> {
+class InCoreLIDPP: public DPPBase<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    InCoreLIDPP(std::shared_ptr<GraphT> _G): DPP<V, E>(_G) { }
+    InCoreLIDPP(std::shared_ptr<GraphT> _G): DPPBase<V, E>(_G) { }
     virtual ~InCoreLIDPP() = default;
 
 

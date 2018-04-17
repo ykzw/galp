@@ -3,7 +3,7 @@
 #pragma once
 
 #include "label_propagator.h"
-#include "segmented_reduce.cuh"
+#include "../common/segmented_reduce.cuh"
 #include "kernel.cuh"
 
 #include "moderngpu.cuh"
@@ -12,12 +12,12 @@
 
 // Data-parallel primitives based label propagation
 template<typename V, typename E>
-class DPP: public LabelPropagator<V, E> {
+class DPPBase: public LabelPropagator<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    DPP(std::shared_ptr<GraphT> _G, int sr_buf=0, bool nalb=false);
-    virtual ~DPP();
+    DPPBase(std::shared_ptr<GraphT> _G, int sr_buf=0, bool nalb=true);
+    virtual ~DPPBase();
 
     std::pair<double, double> run(int niter);
 
@@ -30,7 +30,7 @@ protected:
     virtual int iterate(int i) = 0;
     virtual void postprocess() = 0;
 
-    void perform_lp(int n, int m, int lbl_offset=0, cudaStream_t stream=0, int *pinned_hmem=nullptr);
+    void perform_lp(int n, int m, int lbl_offset=0, int *pinned_hmem=nullptr, cudaStream_t stream=0);
     int get_count();
 
     void init_gmem(V n, int m);
@@ -56,7 +56,7 @@ protected:
 
 
 template<typename V, typename E>
-DPP<V, E>::DPP(std::shared_ptr<GraphT> _G, int sr_buf, bool nalb)
+DPPBase<V, E>::DPPBase(std::shared_ptr<GraphT> _G, int sr_buf, bool nalb)
     : LabelPropagator<V, E>(_G), context(mgpu::CreateCudaDeviceStream(0)),
     reducer(sr_buf > 0 ? sr_buf : _G->m, context->Stream()), no_adj_labels_buf(nalb)
 {
@@ -66,7 +66,7 @@ DPP<V, E>::DPP(std::shared_ptr<GraphT> _G, int sr_buf, bool nalb)
 
 
 template<typename V, typename E>
-DPP<V, E>::~DPP()
+DPPBase<V, E>::~DPPBase()
 {
     cudaHostUnregister((void *) &G->neighbors[0]);
     cudaHostUnregister((void *) &G->offsets[0]);
@@ -74,7 +74,7 @@ DPP<V, E>::~DPP()
 
 
 template<typename V, typename E>
-std::pair<double, double> DPP<V, E>::run(int niter)
+std::pair<double, double> DPPBase<V, E>::run(int niter)
 {
     Timer t1, t2;
     t2.start();
@@ -120,7 +120,7 @@ std::pair<double, double> DPP<V, E>::run(int niter)
 
 
 template<typename V, typename E>
-void DPP<V, E>::perform_lp(int n, int m, int lbl_offset, cudaStream_t stream, int *pinned_hmem)
+void DPPBase<V, E>::perform_lp(int n, int m, int lbl_offset, int *pinned_hmem, cudaStream_t stream)
 {
     const int nthreads = 256;
     const int n_blocks = divup(n, nthreads);
@@ -158,7 +158,7 @@ void DPP<V, E>::perform_lp(int n, int m, int lbl_offset, cudaStream_t stream, in
 
 // Return the number of labels updated
 template<typename V, typename E>
-int DPP<V, E>::get_count()
+int DPPBase<V, E>::get_count()
 {
     int counter;
     cudaMemcpy(&counter, d_counter, sizeof(int), cudaMemcpyDeviceToHost);
@@ -169,8 +169,7 @@ int DPP<V, E>::get_count()
 
 
 template<typename V, typename E>
-void DPP<V, E>::init_gmem
-(V n, int m)
+void DPPBase<V, E>::init_gmem(V n, int m)
 {
     cudaMalloc(&d_neighbors,      sizeof(int) * m);
     cudaMalloc(&d_offsets,        sizeof(int) * (n + 1));
@@ -192,7 +191,7 @@ void DPP<V, E>::init_gmem
 
 
 template<typename V, typename E>
-void DPP<V, E>::free_gmem()
+void DPPBase<V, E>::free_gmem()
 {
     cudaFree(d_neighbors);
     cudaFree(d_offsets);

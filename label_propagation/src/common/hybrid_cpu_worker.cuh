@@ -95,8 +95,7 @@ struct CPUWorker {
 
 
 template<typename V, typename E>
-int CPUWorker<V, E>::run
-(int i, int tid)
+int CPUWorker<V, E>::run(int i, int tid)
 {
     Timer cput;
     if (tid == 0) {
@@ -133,7 +132,7 @@ int CPUWorker<V, E>::run
         if (tid == 0) {
             cudaMemcpyAsync(d_labels + bbs[task], h_labels + bbs[task],
                             sizeof(int) * (bbs[task + 1] - bbs[task]), cudaMemcpyHostToDevice, stream);
-            // cudaDeviceSynchronize();
+            // cudaDeviceSynchronize();n
         }
     }
 
@@ -152,8 +151,7 @@ int CPUWorker<V, E>::run
 
 
 template<typename V, typename E>
-void CPUWorker<V, E>::set_new_task
-(int i)
+void CPUWorker<V, E>::set_new_task(int i)
 {
     omp_set_lock(&qlock);
     if (tql[i].size() > 3) {
@@ -171,8 +169,7 @@ void CPUWorker<V, E>::set_new_task
 
 
 template<typename V, typename E>
-bool CPUWorker<V, E>::update_label
-(V v, E begin, E end)
+bool CPUWorker<V, E>::update_label(V v, E begin, E end)
 {
     std::map<V, int> label_count;
     V max_label = h_labels[v];

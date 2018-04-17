@@ -11,14 +11,10 @@
 #include "myutil.h"
 #include "graph.h"
 
-#include "dpp/incore.cuh"
-#include "dpp/sync.cuh"
-#include "dpp/async.cuh"
+#include "dpp/variants.cuh"
 #include "dpp/incore_li.cuh"
-#include "dpp/hybrid.cuh"
 
-#include "lfht/incore.cuh"
-#include "lfht/async.cuh"
+#include "lfht/variants.cuh"
 
 #include "../../graph_clustering_orig/nmi.h"
 
@@ -30,18 +26,20 @@ std::unique_ptr<T> make_unique(Args&&... args)
 }
 
 
+
 int main(int argc, char *argv[])
 {
-    if (argc < 5) {
+    if (argc < 6) {
         printf("usage: ./label_propagation {0: async, 1: sync, 2: li, 3: hybrid} graph_file iterations buffersize [ground_truth_file]\n");
         return 1;
     }
 
-    const int niter = atoi(argv[3]);
-    const int buffer_size = atoi(argv[4]);
-
     const int mode = atoi(argv[1]);
-    const char *graph_file = argv[2];
+    const int lfht_policy = atoi(argv[2]);
+    const char *graph_file = argv[3];
+
+    const int niter = atoi(argv[4]);
+    const int buffer_size = atoi(argv[5]);
 
     using Vertex = int32_t;
     using Edge = int64_t;
@@ -58,9 +56,15 @@ int main(int argc, char *argv[])
 
     std::string proc_name;
 
-    if (mode != 2 && mode < 4 && m < (1 << buffer_size)) {
-        proc_name = "dpp incore";
-        propagator = make_unique<InCoreDPP<Vertex, Edge>>(graph);
+    if (m < (1 << buffer_size)) {
+        // Data is smaller than the buffer
+        if (mode < 4) {
+            proc_name = "dpp incore";
+            propagator = make_unique<InCoreDPP<Vertex, Edge>>(graph);
+        } else {
+            proc_name = std::string("lfht incore ") + std::string(argv[2]);
+            propagator = make_unique<InCoreLFHT<Vertex, Edge>>(graph, lfht_policy);
+        }
     } else {
         switch (mode) {
         case 0:
@@ -72,36 +76,44 @@ int main(int argc, char *argv[])
             propagator = make_unique<SyncDPP<Vertex, Edge>>(graph, buffer_size);
             break;
         case 2:
-            proc_name = "dpp li";
-            propagator = make_unique<InCoreLIDPP<Vertex, Edge>>(graph);
-            break;
-        case 3:
             proc_name = "dpp hybrid";
             propagator = make_unique<HybridDPP<Vertex, Edge>>(graph, buffer_size);
             break;
+        case 3:
+            proc_name = "dpp li";
+            propagator = make_unique<InCoreLIDPP<Vertex, Edge>>(graph);
+            break;
         case 4:
-            proc_name = "lfht async";
-            propagator = make_unique<AsyncLFHT<Vertex, Edge>>(graph, buffer_size);
-            // propagator = make_unique<InCoreLFHT<Vertex, Edge>>(graph);
+            proc_name = std::string("lfht async ") + std::string(argv[2]);
+            propagator = make_unique<AsyncLFHT<Vertex, Edge>>(graph, lfht_policy, buffer_size);
+            break;
+        case 5:
+            proc_name = std::string("lfht sync ") + std::string(argv[2]);
+            propagator = make_unique<SyncLFHT<Vertex, Edge>>(graph, lfht_policy, buffer_size);
+            break;
+        case 6:
+            proc_name = std::string("lfht hybrid ") + std::string(argv[2]);
+            propagator = make_unique<HybridLFHT<Vertex, Edge>>(graph, lfht_policy, buffer_size);
             break;
         }
     }
     std::pair<double, double> result = propagator->run(niter);
 
-    // for (auto i: range(100)) {
-    //     printf("%d, %d\n", i, propagator->labels[i]);
-    // }
+    for (auto i: range(100)) {
+        printf("%d, %d\n", i, propagator->labels[i]);
+    }
 
     double f1 = result.first;
     double f2 = result.second;
 
-    if (argc == 6) {  // Check the accuracy
+    const char *filename = basename(argv[3]);
+    if (argc >= 7) {  // Check the accuracy
         double nmi = 0.0;
         double fm = 0.0;
         double ari = 0.0;
 
         auto labels = propagator->get_labels();
-        const char *ground_truth_file = argv[5];
+        const char *ground_truth_file = argv[6];
 
         Timer tnmi; tnmi.start();
         nmi = compute_nmi(ground_truth_file, labels);
@@ -116,9 +128,10 @@ int main(int argc, char *argv[])
         tari.stop();
 
         fprintf(stderr, "%s\t%s\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n",
-                proc_name.c_str(), argv[2], niter, buffer_size, f1, f2, nmi, fm, ari);
+                proc_name.c_str(), filename, niter, buffer_size, f1, f2, nmi, fm, ari);
     } else {
-        fprintf(stderr, "%s\t%s\t%d\t%d\t%f\t%f\n", proc_name.c_str(), argv[2], niter, buffer_size, f1, f2);
+        fprintf(stderr, "%s\t%s\t%d\t%d\t%f\t%f\n",
+                proc_name.c_str(), filename, niter, buffer_size, f1, f2);
     }
 
     return 0;
