@@ -8,14 +8,21 @@
 #include "kernel.cuh"
 #include "../common/segmented_reduce.cuh"
 
+template<typename V, typename E, typename S>
+class MultiAsyncLP;
+
 
 template<typename V, typename E>
 class LFHTBase: public LabelPropagator<V, E> {
 public:
+    friend MultiAsyncLP<V, E, LFHTBase<V, E>>;
+
     using GraphT = CSRGraph<V, E>;
 
     LFHTBase(std::shared_ptr<GraphT> _G, int p, bool nalb=true)
         : LabelPropagator<V, E>(_G), policy(p), context(mgpu::CreateCudaDeviceStream(0)), no_adj_labels_buf(nalb) { }
+    LFHTBase(std::shared_ptr<GraphT> _G, int p, int gpu)
+        : LabelPropagator<V, E>(_G), policy(p), context(mgpu::CreateCudaDeviceStream(gpu)), no_adj_labels_buf(true) { }
     virtual ~LFHTBase() = default;
 
     std::pair<double, double> run(int niter);
