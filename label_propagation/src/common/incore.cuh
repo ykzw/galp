@@ -16,7 +16,6 @@ public:
     InCoreLP(std::shared_ptr<GraphT> _G, int p): S(_G, p, false) { }
     virtual ~InCoreLP() = default;
 
-
 protected:
     // Methods
     void preprocess();

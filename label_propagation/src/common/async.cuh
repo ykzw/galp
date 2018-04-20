@@ -6,6 +6,13 @@
 #include "outofcore.cuh"
 
 
+template<typename V, typename E, typename S>
+class MultiAsyncLP;
+
+// template<typename V, typename E, typename S>
+// class MultiInCoreLP;
+
+
 // GPU out-of-core with overlap, data-parallel primitives based label propagation
 template<typename V, typename E, typename S>
 class AsyncLP: public S, public OutOfCore<V, E> {
@@ -16,8 +23,12 @@ public:
         : S(_G), OutOfCore<V, E>(_G, bs) { }
     AsyncLP(std::shared_ptr<GraphT> _G, int p, int bs)
         : S(_G, p), OutOfCore<V, E>(_G, bs) { }
+    AsyncLP(std::shared_ptr<GraphT> _G, int p, int bs, int gpu)
+        : S(_G, p, gpu), OutOfCore<V, E>(_G, bs) { }
     virtual ~AsyncLP() = default;
 
+    friend MultiAsyncLP<V, E, AsyncLP<V, E, S>>;
+    // friend MultiInCoreLP<V, E, AsyncLP<V, E, S>>;
 
 private:
     // Methods

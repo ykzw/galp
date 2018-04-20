@@ -80,7 +80,7 @@ __global__ void update_lockfree
             }
         }
         if (labels[v + v_offset] != my_max_key - 1) {
-            ++(*counter);
+            atomicAdd(counter, 1);
             labels[v + v_offset] = my_max_key - 1;
         }
     }
@@ -160,7 +160,7 @@ __global__ void update_lockfree_smem
         }
         auto lbl = labels[v + v_offset];
         if (lbl != my_max_key - 1) {
-            ++(*counter);
+            atomicAdd(counter, 1);
             labels[v + v_offset] = my_max_key - 1;
         }
     }
@@ -210,7 +210,7 @@ __global__ void assign_blocks
 template<int NT, int TS>
 __global__ void update_lockfree_smem_lb
 (int *neighbors, int *offsets, int *labels, int2 *assignments,
- GlobalHT g_tables, int *max_counts, int *d_counter, int v_offset=0)
+ GlobalHT g_tables, int *max_counts, int *counter, int v_offset=0)
 {
     constexpr int SC = TS + NT;  // capacity
     __shared__ SharedHT<SC> s_table;
@@ -275,7 +275,7 @@ __global__ void update_lockfree_smem_lb
             labels[vertex + v_offset] = s_max_key - 1;
             if (lbl != s_max_key - 1) {
                 // May count redundantly
-                ++(*d_counter);
+                atomicAdd(counter, 1);
             }
         }
     }

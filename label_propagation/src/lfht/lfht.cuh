@@ -23,6 +23,8 @@ public:
         : LabelPropagator<V, E>(_G), policy(p), context(mgpu::CreateCudaDeviceStream(0)), no_adj_labels_buf(nalb) { }
     LFHTBase(std::shared_ptr<GraphT> _G, int p, int gpu)
         : LabelPropagator<V, E>(_G), policy(p), context(mgpu::CreateCudaDeviceStream(gpu)), no_adj_labels_buf(true) { }
+    LFHTBase(std::shared_ptr<GraphT> _G)
+        : LabelPropagator<V, E>(_G), policy(2), context(mgpu::CreateCudaDeviceStream(0)), no_adj_labels_buf(true) { }
     virtual ~LFHTBase() = default;
 
     std::pair<double, double> run(int niter);
@@ -74,9 +76,6 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
     Timer t1, t2;
     t2.start();
 
-    cudaHostRegister((void *) &G->neighbors[0], sizeof(V) * G->m, cudaHostRegisterMapped);
-    cudaHostRegister((void *) &G->offsets[0], sizeof(E) * (G->n + 1), cudaHostRegisterMapped);
-
     preprocess();
 
     const auto n = G->n;
@@ -110,9 +109,6 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
 
     t1.stop();
     t2.stop();
-
-    cudaHostUnregister((void *) &G->neighbors[0]);
-    cudaHostUnregister((void *) &G->offsets[0]);
 
     postprocess();
 

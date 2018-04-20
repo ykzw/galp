@@ -16,7 +16,7 @@
 
 #include "lfht/variants.cuh"
 
-#include "../../graph_clustering_orig/nmi.h"
+#include "../nmi.h"
 
 
 template<typename T, typename... Args>
@@ -29,22 +29,30 @@ std::unique_ptr<T> make_unique(Args&&... args)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 6) {
+    if (argc < 7) {
         printf("usage: ./label_propagation {0: async, 1: sync, 2: li, 3: hybrid} graph_file iterations buffersize [ground_truth_file]\n");
         return 1;
     }
 
     const int mode = atoi(argv[1]);
     const int lfht_policy = atoi(argv[2]);
-    const char *graph_file = argv[3];
+    const int ngpus = atoi(argv[3]);
+    const char *graph_file = argv[4];
 
-    const int niter = atoi(argv[4]);
-    const int buffer_size = atoi(argv[5]);
+    const int niter = atoi(argv[5]);
+    const int buffer_size = atoi(argv[6]);
 
     using Vertex = int32_t;
     using Edge = int64_t;
     using GraphT = CSRGraph<Vertex, Edge>;
     using Propagator = LabelPropagator<Vertex, Edge>;
+
+    // Warm up
+    #pragma omp parallel for num_threads(ngpus)
+    for (int i = 0; i < ngpus; ++i) {
+        cudaSetDevice(i);
+        cudaFree(0);
+    }
 
     // Load a graph
     std::shared_ptr<GraphT> graph(new CSRGraph<Vertex, Edge>(graph_file));
@@ -95,6 +103,15 @@ int main(int argc, char *argv[])
             proc_name = std::string("lfht hybrid ") + std::string(argv[2]);
             propagator = make_unique<HybridLFHT<Vertex, Edge>>(graph, lfht_policy, buffer_size);
             break;
+        case 7:
+            proc_name = std::string("lfht multi async ") + std::string(argv[2]);
+            propagator = make_unique<MultiAsyncLFHT<Vertex, Edge>>(graph, ngpus, lfht_policy, buffer_size);
+            break;
+        case 8:
+            proc_name = std::string("lfht multi incore ") + std::string(argv[2]);
+            // propagator = make_unique<MultiInCoreLFHT<Vertex, Edge>>(graph, ngpus, lfht_policy);
+            propagator = make_unique<MultiInCoreLP<Vertex, Edge>>(graph, ngpus, lfht_policy);
+            break;
         }
     }
     std::pair<double, double> result = propagator->run(niter);
@@ -106,14 +123,14 @@ int main(int argc, char *argv[])
     double f1 = result.first;
     double f2 = result.second;
 
-    const char *filename = basename(argv[3]);
-    if (argc >= 7) {  // Check the accuracy
+    const char *filename = basename(argv[4]);
+    if (argc > 7) {  // Check the accuracy
         double nmi = 0.0;
         double fm = 0.0;
         double ari = 0.0;
 
         auto labels = propagator->get_labels();
-        const char *ground_truth_file = argv[6];
+        const char *ground_truth_file = argv[7];
 
         Timer tnmi; tnmi.start();
         nmi = compute_nmi(ground_truth_file, labels);

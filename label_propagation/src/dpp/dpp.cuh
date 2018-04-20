@@ -16,8 +16,9 @@ class DPPBase: public LabelPropagator<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
 
-    DPPBase(std::shared_ptr<GraphT> _G, bool nalb=true);
-    virtual ~DPPBase();
+    DPPBase(std::shared_ptr<GraphT> _G, bool nalb=true)
+        : LabelPropagator<V, E>(_G), context(mgpu::CreateCudaDeviceStream(0)), no_adj_labels_buf(nalb) { }
+    virtual ~DPPBase() = default;
 
     std::pair<double, double> run(int niter);
 
@@ -54,22 +55,6 @@ protected:
     bool no_adj_labels_buf; // Don't allocate d_adj_labels if true
 };
 
-
-template<typename V, typename E>
-DPPBase<V, E>::DPPBase(std::shared_ptr<GraphT> _G, bool nalb)
-    : LabelPropagator<V, E>(_G), context(mgpu::CreateCudaDeviceStream(0)), no_adj_labels_buf(nalb)
-{
-    cudaHostRegister((void *) &G->neighbors[0], sizeof(V) * G->m, cudaHostRegisterMapped);
-    cudaHostRegister((void *) &G->offsets[0], sizeof(E) * (G->n + 1), cudaHostRegisterMapped);
-}
-
-
-template<typename V, typename E>
-DPPBase<V, E>::~DPPBase()
-{
-    cudaHostUnregister((void *) &G->neighbors[0]);
-    cudaHostUnregister((void *) &G->offsets[0]);
-}
 
 
 template<typename V, typename E>

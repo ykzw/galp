@@ -104,9 +104,17 @@ public:
             this->n = offsets.size() - 1;
             this->m = neighbors.size();
         }
+
+        cudaHostRegister((void *) &neighbors[0], sizeof(V) * this->m,
+                         cudaHostRegisterMapped | cudaHostRegisterPortable);
+        cudaHostRegister((void *) &offsets[0], sizeof(E) * (this->n + 1),
+                         cudaHostRegisterMapped | cudaHostRegisterPortable);
     }
 
-    ~CSRGraph() = default;
+    ~CSRGraph() {
+        cudaHostUnregister((void *) &neighbors[0]);
+        cudaHostUnregister((void *) &offsets[0]);
+    }
 
     void load_symmetric_edgelist_bin(const std::string &filename) {
         std::ifstream ifs(filename, std::ios::binary | std::ios::ate);
