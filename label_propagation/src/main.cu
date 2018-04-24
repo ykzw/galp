@@ -104,11 +104,11 @@ int main(int argc, char *argv[])
             propagator = make_unique<HybridLFHT<Vertex, Edge>>(graph, lfht_policy, buffer_size);
             break;
         case 7:
-            proc_name = std::string("lfht multi async ") + std::string(argv[2]);
+            proc_name = std::string("lfht multi async ") + std::string(argv[2]) + std::string(" ") + std::string(argv[3]);
             propagator = make_unique<MultiAsyncLFHT<Vertex, Edge>>(graph, ngpus, lfht_policy, buffer_size);
             break;
         case 8:
-            proc_name = std::string("lfht multi incore ") + std::string(argv[2]);
+            proc_name = std::string("lfht multi incore ") + std::string(argv[2]) + std::string(" ") + std::string(argv[3]);
             // propagator = make_unique<MultiInCoreLFHT<Vertex, Edge>>(graph, ngpus, lfht_policy);
             propagator = make_unique<MultiInCoreLP<Vertex, Edge>>(graph, ngpus, lfht_policy);
             break;
@@ -116,9 +116,9 @@ int main(int argc, char *argv[])
     }
     std::pair<double, double> result = propagator->run(niter);
 
-    for (auto i: range(100)) {
-        printf("%d, %d\n", i, propagator->labels[i]);
-    }
+    // for (auto i: range(100)) {
+    //     printf("%d, %d\n", i, propagator->labels[i]);
+    // }
 
     double f1 = result.first;
     double f2 = result.second;

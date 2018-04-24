@@ -76,12 +76,20 @@ std::pair<double, double> MultiInCoreLP<V, E>::run(int niter)
         int gpu = omp_get_thread_num();
         cudaSetDevice(gpu);
 
-        V *h_neighbors;
-        E *h_offsets;
-        cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
-        cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
-        initialize_labels<<<n_blocks, nthreads>>>
-            (d_labels[gpu], n, h_neighbors, h_offsets);
+        cudaDeviceSynchronize();
+
+        int bn = gpu_boundaries[gpu + 1] - gpu_boundaries[gpu];
+        initialize_labels<<<divup(bn, nthreads), nthreads, 0, streams[gpu]>>>
+            (d_labels[gpu] + gpu_boundaries[gpu], bn, d_neighbors[gpu], d_offsets[gpu]);
+        cudaDeviceSynchronize();
+
+        if (ngpus > 1) {
+            for (auto g: range(ngpus)) {
+                int gn = gpu_boundaries[g + 1] - gpu_boundaries[g];
+                ncclBcast((void *) (d_labels[gpu] + gpu_boundaries[g]), gn, ncclInt, g, comms[gpu], streams[gpu]);
+            }
+        }
+        cudaDeviceSynchronize();
 
         // Main loop
         for (auto i: range(niter)) {
@@ -160,7 +168,6 @@ void MultiInCoreLP<V, E>::preprocess()
 
         int bn = gpu_boundaries[i + 1] - gpu_boundaries[i];
         int bm = G->offsets[gpu_boundaries[i + 1]] - G->offsets[gpu_boundaries[i]];
-        printf("%d, %d, %d\n", i, bn, bm);
 
         cudaMalloc(&d_neighbors[i], sizeof(int) * bm);
         cudaMalloc(&d_offsets[i], sizeof(int) * (bn + 1));
@@ -194,7 +201,6 @@ int MultiInCoreLP<V, E>::iterate(int i, int gpu)
     const int nt = 32;
     update_lockfree_smem<nt, nt * 3><<<bn, nt, 0, streams[gpu]>>>
         (d_neighbors[gpu], d_offsets[gpu], d_labels[gpu], d_tables[gpu], d_counter[gpu], gpu_boundaries[gpu]);
-
     cudaDeviceSynchronize();
 
     if (ngpus > 1) {
