@@ -26,7 +26,8 @@ __global__ void initialize_labels(V *labels, V n, const V *neighbors, const E *o
 {
     for (auto i: grid_stride_range(n)) {
         // Choose some arbitrary neighbors
-        labels[i] = neighbors[(offsets[i] + offsets[i + 1]) / 2];
+        E j = (offsets[i] / 2) + (offsets[i + 1] / 2) + (offsets[i] & offsets[i + 1] & 1);
+        labels[i] = neighbors[j];
     }
 }
 
@@ -143,8 +144,8 @@ __device__ __inline__ bool _update(int w1, int w2, int i1, int i2)
 __global__ void compute_max_labels
 (int *segments, int *seg_offsets, int *adj_labels, int *labels, int n, int *counter)
 {
-    __shared__ int s_weights[256];
-    __shared__ int s_indexes[256];
+    __shared__ int s_weights[128];
+    __shared__ int s_indexes[128];
 
     int c = 0;
 

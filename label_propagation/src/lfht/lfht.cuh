@@ -79,7 +79,7 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
     preprocess();
 
     const auto n = G->n;
-    const int nthreads = 256;
+    const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
     // initialize_labels<<<n_blocks, nthreads>>>(d_labels, n);
 
@@ -122,11 +122,11 @@ void LFHTBase<V, E>::perform_lp(int n, int m, int v_offset, int *pinned_hmem, cu
     cudaMemsetAsync(d_tables.keys, 0, sizeof(uint32_t) * m, stream);
     cudaMemsetAsync(d_tables.vals, 0, sizeof(uint32_t) * m, stream);
 
-    const int nthreads = 256;
+    const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
     const int m_blocks = divup(m, nthreads);
 
-    const int nt = 32;
+    const int nt = 64;
     switch (policy) {
     case 0:  // Naive
         gather_labels<<<m_blocks, nthreads, 0, stream>>>
@@ -161,7 +161,7 @@ void LFHTBase<V, E>::perform_lp(int n, int m, int v_offset, int *pinned_hmem, cu
         } else {
             cudaMemcpyAsync(&nb, d_num_blocks + n, sizeof(int), cudaMemcpyDeviceToHost, stream);
         }
-        assign_blocks<ts><<<32, 256, 0, stream>>>(d_num_blocks, n, d_assignments);
+        assign_blocks<ts><<<64, 128, 0, stream>>>(d_num_blocks, n, d_assignments);
         update_lockfree_smem_lb<nt, ts><<<nb, nt, 0, stream>>>
             (d_neighbors, d_offsets, d_labels, d_assignments, d_tables, d_max_counts, d_counter, v_offset);
         break;

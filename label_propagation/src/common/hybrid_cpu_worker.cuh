@@ -78,7 +78,7 @@ struct CPUWorker {
     // Data shared with GPU workers
     CSRGraph<V, E> *G;
     const std::vector<int> &bbs;  // batch boundaries
-    std::vector<std::deque<int>> &tql;  // task queue list
+    TaskQueueList &tql;  // task queue list
     omp_lock_t &qlock;  // task queue list
     V *h_labels;
     int *d_labels;
@@ -129,10 +129,11 @@ int CPUWorker<V, E>::run(int i, int tid)
         }
 
         barrier->sync(tid);
+
         if (tid == 0) {
             cudaMemcpyAsync(d_labels + bbs[task], h_labels + bbs[task],
                             sizeof(int) * (bbs[task + 1] - bbs[task]), cudaMemcpyHostToDevice, stream);
-            // cudaDeviceSynchronize();n
+            // cudaDeviceSynchronize();
         }
     }
 
@@ -179,8 +180,6 @@ bool CPUWorker<V, E>::update_label(V v, E begin, E end)
         V u = G->neighbors[k];
         V label = h_labels[u];
         int c = ++(label_count[label]);
-        // if ((max_count < c) ||
-        //     (max_count == c && label > max_label)) {
         if (max_count <= c) {
             max_count = c;
             max_label = label;

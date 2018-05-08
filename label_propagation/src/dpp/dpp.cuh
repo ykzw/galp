@@ -66,7 +66,7 @@ std::pair<double, double> DPPBase<V, E>::run(int niter)
     preprocess();
 
     const auto n = G->n;
-    const int nthreads = 256;
+    const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
     // initialize_labels<<<n_blocks, nthreads>>>(d_labels, n);
 
@@ -106,7 +106,7 @@ std::pair<double, double> DPPBase<V, E>::run(int niter)
 template<typename V, typename E>
 void DPPBase<V, E>::perform_lp(int n, int m, int lbl_offset, int *pinned_hmem, cudaStream_t stream)
 {
-    const int nthreads = 256;
+    const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
     const int m_blocks = divup(m, nthreads);
 

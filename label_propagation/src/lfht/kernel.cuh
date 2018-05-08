@@ -167,7 +167,6 @@ __global__ void update_lockfree_smem
 }
 
 
-
 template<int TS>
 __global__ void compute_num_blocks // per vertex
 (int *offsets, int n, int *num_blocks)

@@ -49,7 +49,7 @@ int InCoreLIDPP<V, E>::iterate(int i)
     static void *d_temp_storage = NULL;
     static size_t temp_storage_bytes = 0;
 
-    const int nthreads = 256;
+    const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
     const int m_blocks = divup(m, nthreads);
 

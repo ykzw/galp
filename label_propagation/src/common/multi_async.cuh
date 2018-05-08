@@ -70,11 +70,11 @@ std::pair<double, double> MultiAsyncLP<V, E, S>::run(int niter)
         int gpu = omp_get_thread_num();
         cudaSetDevice(gpu);
 
-        V *h_neighbors;
-        E *h_offsets;
-        cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
-        cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
         if (gpu == 0) {
+            V *h_neighbors;
+            E *h_offsets;
+            cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
+            cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
             initialize_labels<<<n_blocks, nthreads>>>
                 (propagators[gpu]->d_labels, n, h_neighbors, h_offsets);
             cudaDeviceSynchronize();
@@ -132,15 +132,17 @@ void MultiAsyncLP<V, E, S>::preprocess()
 
     comms = (ncclComm_t *) malloc(sizeof(ncclComm_t) * ngpus);
 
-    ncclUniqueId id;
-    ncclGetUniqueId(&id);
+    // ncclUniqueId id;
+    // ncclGetUniqueId(&id);
+    ncclCommInitAll(comms, ngpus, nullptr);
 
     #pragma omp parallel for num_threads(ngpus)
     for (int i = 0; i < ngpus; ++i) {
         cudaSetDevice(i);
 
-        ncclCommInitRank(&comms[i], ngpus, id, i);
+        // ncclCommInitRank(&comms[i], ngpus, id, i);
 
+        #pragma omp critical
         if (policy >= 0) {
             propagators[i] = new S(G, policy, bs, i);
         } else {
@@ -177,10 +179,7 @@ int MultiAsyncLP<V, E, S>::iterate(int i, int gpu)
             int batch_n = P->get_num_batch_vertices(j);
             int batch_m = P->get_num_batch_edges(j);
             P->perform_lp(batch_n, batch_m, P->bbs[j], &(P->h_norm_offsets[G->n + 1]), P->stream1);
-            cudaStreamSynchronize(P->stream1);
         }
-
-        #pragma omp barrier
 
         for (auto g: range(ngpus)) {
             int b = a + g;

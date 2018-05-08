@@ -193,7 +193,7 @@ std::pair<Task, Task> HybridLP<V, E, S>::get_new_GPU_tasks(int i)
             next = tql[i + 1].front();
         }
     } else {
-        cur = -1;
+        cur = next = -1;
     }
     omp_unset_lock(&qlock);
 
