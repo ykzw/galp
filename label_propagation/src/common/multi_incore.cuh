@@ -76,20 +76,22 @@ std::pair<double, double> MultiInCoreLP<V, E>::run(int niter)
         int gpu = omp_get_thread_num();
         cudaSetDevice(gpu);
 
-        cudaDeviceSynchronize();
+        initialize_labels<<<n_blocks, nthreads>>>(d_labels[gpu], n);
 
-        int bn = gpu_boundaries[gpu + 1] - gpu_boundaries[gpu];
-        initialize_labels<<<divup(bn, nthreads), nthreads, 0, streams[gpu]>>>
-            (d_labels[gpu] + gpu_boundaries[gpu], bn, d_neighbors[gpu], d_offsets[gpu]);
-        cudaDeviceSynchronize();
+        // cudaDeviceSynchronize();
 
-        if (ngpus > 1) {
-            for (auto g: range(ngpus)) {
-                int gn = gpu_boundaries[g + 1] - gpu_boundaries[g];
-                ncclBcast((void *) (d_labels[gpu] + gpu_boundaries[g]), gn, ncclInt, g, comms[gpu], streams[gpu]);
-            }
-        }
-        cudaDeviceSynchronize();
+        // int bn = gpu_boundaries[gpu + 1] - gpu_boundaries[gpu];
+        // initialize_labels_2<<<divup(bn, nthreads), nthreads, 0, streams[gpu]>>>
+        //     (d_labels[gpu] + gpu_boundaries[gpu], bn, d_neighbors[gpu], d_offsets[gpu]);
+        // cudaDeviceSynchronize();
+
+        // if (ngpus > 1) {
+        //     for (auto g: range(ngpus)) {
+        //         int gn = gpu_boundaries[g + 1] - gpu_boundaries[g];
+        //         ncclBcast((void *) (d_labels[gpu] + gpu_boundaries[g]), gn, ncclInt, g, comms[gpu], streams[gpu]);
+        //     }
+        // }
+        // cudaDeviceSynchronize();
 
         // Main loop
         for (auto i: range(niter)) {

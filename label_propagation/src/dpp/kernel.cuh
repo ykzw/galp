@@ -5,6 +5,9 @@
 #include "../common/range.cuh"
 
 
+__device__ uint32_t hash(uint32_t);
+
+
 __inline__ __device__ int get_gid()
 {
     return threadIdx.x + blockIdx.x * blockDim.x;
@@ -30,6 +33,21 @@ __global__ void initialize_labels(V *labels, V n, const V *neighbors, const E *o
         labels[i] = neighbors[j];
     }
 }
+
+
+template<typename V, typename E>
+__global__ void initialize_labels_2(V *labels, V n, const V *neighbors, const E *offsets)
+{
+    for (auto i: grid_stride_range(n)) {
+        // Choose some arbitrary neighbors
+        // auto h = hash(i);
+        // auto s = offsets[i + 1] - offsets[i];
+        // auto j = offsets[i] + (h % s);
+        // labels[i] = neighbors[j];
+        labels[i] = i;
+    }
+}
+
 
 
 // Create an array (dst) of neighbor labels

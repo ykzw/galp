@@ -70,20 +70,22 @@ std::pair<double, double> MultiAsyncLP<V, E, S>::run(int niter)
         int gpu = omp_get_thread_num();
         cudaSetDevice(gpu);
 
-        if (gpu == 0) {
-            V *h_neighbors;
-            E *h_offsets;
-            cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
-            cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
-            initialize_labels<<<n_blocks, nthreads>>>
-                (propagators[gpu]->d_labels, n, h_neighbors, h_offsets);
-            cudaDeviceSynchronize();
-        }
+        initialize_labels<<<n_blocks, nthreads>>>(propagators[gpu]->d_labels, n);
 
-        if (ngpus > 1) {
-            ncclBcast((void *) (propagators[gpu]->d_labels), n, ncclInt, 0, comms[gpu], propagators[gpu]->stream1);
-            cudaDeviceSynchronize();
-        }
+        // if (gpu == 0) {
+        //     V *h_neighbors;
+        //     E *h_offsets;
+        //     cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
+        //     cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
+        //     initialize_labels_2<<<n_blocks, nthreads>>>
+        //         (propagators[gpu]->d_labels, n, h_neighbors, h_offsets);
+        //     cudaDeviceSynchronize();
+        // }
+
+        // if (ngpus > 1) {
+        //     ncclBcast((void *) (propagators[gpu]->d_labels), n, ncclInt, 0, comms[gpu], propagators[gpu]->stream1);
+        //     cudaDeviceSynchronize();
+        // }
 
         // Main loop
         for (auto i: range(niter)) {

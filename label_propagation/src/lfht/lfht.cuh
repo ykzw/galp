@@ -81,13 +81,16 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
     const auto n = G->n;
     const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
-    // initialize_labels<<<n_blocks, nthreads>>>(d_labels, n);
 
-    V *h_neighbors;
-    E *h_offsets;
-    cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
-    cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
-    initialize_labels<<<n_blocks, nthreads>>>(d_labels, n, h_neighbors, h_offsets);
+    if (no_adj_labels_buf) {
+        V *h_neighbors;
+        E *h_offsets;
+        cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
+        cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
+        initialize_labels_2<<<n_blocks, nthreads>>>(d_labels, n, h_neighbors, h_offsets);
+    } else {
+        initialize_labels_2<<<n_blocks, nthreads>>>(d_labels, n, d_neighbors, d_offsets);
+    }
 
     t1.start();
     // Main loop

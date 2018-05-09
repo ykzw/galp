@@ -56,8 +56,8 @@ struct CPUWorker {
 
             #pragma omp for
             for (int i = 0; i < G->n; ++i) {
-                // h_labels[i] = i;
-                h_labels[i] = G->neighbors[(G->offsets[i] + G->offsets[i + 1]) / 2];
+                h_labels[i] = i;
+                // h_labels[i] = G->neighbors[(G->offsets[i] + G->offsets[i + 1]) / 2];
             }
         }
         barrier = new Barrier(nworkers);
