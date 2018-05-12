@@ -37,6 +37,7 @@ protected:
     virtual void postprocess() = 0;
 
     void perform_lp(int n, int m, int v_offset=0, int *pinned_hmem=nullptr, cudaStream_t stream=0);
+    void perform_lp2(int n, int m, int v_offset=0, int *pinned_hmem=nullptr, cudaStream_t stream=0);
     int get_count();
 
     void init_gmem(V n, int m);
@@ -44,6 +45,7 @@ protected:
 
     // Attributes
     using LabelPropagator<V, E>::G;
+    using LabelPropagator<V, E>::labels;
 
     int policy;
 
@@ -53,6 +55,7 @@ protected:
     int *d_adj_labels;   // m
     int *d_counter;      // 1
     GlobalHT d_tables;   // m * 2
+    double scale_factor;
 
     mgpu::ContextPtr context;  // Used for scan
     SegmentedReducer *reducer;
@@ -82,15 +85,7 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
     const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
 
-    if (no_adj_labels_buf) {
-        V *h_neighbors;
-        E *h_offsets;
-        cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
-        cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
-        initialize_labels_2<<<n_blocks, nthreads>>>(d_labels, n, h_neighbors, h_offsets);
-    } else {
-        initialize_labels_2<<<n_blocks, nthreads>>>(d_labels, n, d_neighbors, d_offsets);
-    }
+    initialize_labels<<<n_blocks, nthreads>>>(d_labels, n);
 
     t1.start();
     // Main loop
@@ -105,9 +100,10 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
         if (count <= n * 1e-5) {
             break;
         }
+        scale_factor = 1.0;
     }
 
-    cudaMemcpy(this->labels.get(), d_labels, sizeof(V) * n, cudaMemcpyDeviceToHost);
+    cudaMemcpy(labels.get(), d_labels, sizeof(V) * n, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
 
     t1.stop();
@@ -122,8 +118,9 @@ std::pair<double, double> LFHTBase<V, E>::run(int niter)
 template<typename V, typename E>
 void LFHTBase<V, E>::perform_lp(int n, int m, int v_offset, int *pinned_hmem, cudaStream_t stream)
 {
-    cudaMemsetAsync(d_tables.keys, 0, sizeof(uint32_t) * m, stream);
-    cudaMemsetAsync(d_tables.vals, 0, sizeof(uint32_t) * m, stream);
+    int tm = m * scale_factor;
+    cudaMemsetAsync(d_tables.keys, 0, sizeof(uint32_t) * tm, stream);
+    cudaMemsetAsync(d_tables.vals, 0, sizeof(uint32_t) * tm, stream);
 
     const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
@@ -143,7 +140,7 @@ void LFHTBase<V, E>::perform_lp(int n, int m, int v_offset, int *pinned_hmem, cu
 
     case 1:  // Kernel fusion
         update_lockfree<nt><<<n, nt, 0, stream>>>
-            (d_neighbors, d_offsets, d_labels, d_tables, d_counter, v_offset);
+            (d_neighbors, d_offsets, d_labels, d_tables, d_counter, v_offset, scale_factor);
         break;
 
     case 2:  // Kernel fusion and shared memory
@@ -200,8 +197,10 @@ void LFHTBase<V, E>::init_gmem(V n, int m)
 
     cudaMemset(d_counter, 0, sizeof(int));
 
-    cudaMalloc(&(d_tables.keys), sizeof(uint32_t) * m);
-    cudaMalloc(&(d_tables.vals), sizeof(uint32_t) * m);
+    scale_factor = 1.1;
+    int tm = m * scale_factor;
+    cudaMalloc(&(d_tables.keys), sizeof(uint32_t) * tm);
+    cudaMalloc(&(d_tables.vals), sizeof(uint32_t) * tm);
 
     switch (policy) {
     case 0:

@@ -46,6 +46,7 @@ private:
     std::vector<GlobalHT> d_tables;    // m * 2
     std::vector<cudaStream_t> streams;
 
+    double scale_factor;
     ncclComm_t *comms;
 };
 
@@ -78,21 +79,6 @@ std::pair<double, double> MultiInCoreLP<V, E>::run(int niter)
 
         initialize_labels<<<n_blocks, nthreads>>>(d_labels[gpu], n);
 
-        // cudaDeviceSynchronize();
-
-        // int bn = gpu_boundaries[gpu + 1] - gpu_boundaries[gpu];
-        // initialize_labels_2<<<divup(bn, nthreads), nthreads, 0, streams[gpu]>>>
-        //     (d_labels[gpu] + gpu_boundaries[gpu], bn, d_neighbors[gpu], d_offsets[gpu]);
-        // cudaDeviceSynchronize();
-
-        // if (ngpus > 1) {
-        //     for (auto g: range(ngpus)) {
-        //         int gn = gpu_boundaries[g + 1] - gpu_boundaries[g];
-        //         ncclBcast((void *) (d_labels[gpu] + gpu_boundaries[g]), gn, ncclInt, g, comms[gpu], streams[gpu]);
-        //     }
-        // }
-        // cudaDeviceSynchronize();
-
         // Main loop
         for (auto i: range(niter)) {
             Timer t_iter; t_iter.start();
@@ -117,6 +103,7 @@ std::pair<double, double> MultiInCoreLP<V, E>::run(int niter)
 
             if (gpu == 0) {
                 total_count = 0;
+                scale_factor = 1.0;
             }
         }
         cudaDeviceSynchronize();
@@ -163,6 +150,8 @@ void MultiInCoreLP<V, E>::preprocess()
     // ncclGetUniqueId(&id);
     ncclCommInitAll(comms, ngpus, nullptr);
 
+    scale_factor = 1.1;
+
     #pragma omp parallel for num_threads(ngpus)
     for (int i = 0; i < ngpus; ++i) {
         cudaSetDevice(i);
@@ -177,8 +166,9 @@ void MultiInCoreLP<V, E>::preprocess()
         cudaMalloc(&d_offsets[i], sizeof(int) * (bn + 1));
         cudaMalloc(&d_labels[i], sizeof(int) * G->n);
         cudaMalloc(&d_counter[i], sizeof(int));
-        cudaMalloc(&d_tables[i].keys, sizeof(int) * bm);
-        cudaMalloc(&d_tables[i].vals, sizeof(int) * bm);
+        int tm = bm * scale_factor;
+        cudaMalloc(&d_tables[i].keys, sizeof(int) * tm);
+        cudaMalloc(&d_tables[i].vals, sizeof(int) * tm);
         cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking);
 
         cudaMemcpyAsync(d_neighbors[i], &G->neighbors[G->offsets[gpu_boundaries[i]]],
@@ -199,13 +189,13 @@ int MultiInCoreLP<V, E>::iterate(int i, int gpu)
     int bn = gpu_boundaries[gpu + 1] - gpu_boundaries[gpu];
     int bm = G->offsets[gpu_boundaries[gpu + 1]] - G->offsets[gpu_boundaries[gpu]];
 
-    cudaMemsetAsync(d_tables[gpu].keys, 0, sizeof(uint32_t) * bm, streams[gpu]);
-    cudaMemsetAsync(d_tables[gpu].vals, 0, sizeof(uint32_t) * bm, streams[gpu]);
+    int tm = bm * scale_factor;
+    cudaMemsetAsync(d_tables[gpu].keys, 0, sizeof(uint32_t) * tm, streams[gpu]);
+    cudaMemsetAsync(d_tables[gpu].vals, 0, sizeof(uint32_t) * tm, streams[gpu]);
 
-    const int nt = 32;
-    update_lockfree_smem<nt, nt * 3><<<bn, nt, 0, streams[gpu]>>>
-        (d_neighbors[gpu], d_offsets[gpu], d_labels[gpu], d_tables[gpu], d_counter[gpu], gpu_boundaries[gpu]);
-    cudaDeviceSynchronize();
+    const int nt = 64;
+    update_lockfree<nt><<<bn, nt, 0, streams[gpu]>>>
+        (d_neighbors[gpu], d_offsets[gpu], d_labels[gpu], d_tables[gpu], d_counter[gpu], gpu_boundaries[gpu], scale_factor);
 
     if (ngpus > 1) {
         for (auto g: range(ngpus)) {

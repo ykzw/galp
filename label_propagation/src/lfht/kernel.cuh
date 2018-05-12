@@ -49,20 +49,24 @@ __global__ void update_labels
 // - Block per vertex
 template<int NT>
 __global__ void update_lockfree
-(int *neighbors, int *offsets, int *labels, GlobalHT g_tables, int *counter, int v_offset=0)
+(int *neighbors, int *offsets, int *labels, GlobalHT g_tables, int *counter, int v_offset=0, double scale_factor=1.0)
 {
     __shared__ int s_max_keys[NT];
     __shared__ int s_max_counts[NT];
 
     const int v = blockIdx.x;
     const int begin = offsets[v];
+    const int t_beg = begin * scale_factor;
     const int end = offsets[v + 1];
+    const int t_end = end * scale_factor;
     int my_max_count = 0;
     int my_max_key = 0;
     for (auto i: block_stride_range(begin, end)) {
+        auto u = neighbors[i];
+        auto label = labels[u];
         // Keys are >= 1; labels are >= 0
-        auto key = labels[neighbors[i]] + 1;
-        auto c = g_tables.increment(begin, end, key);
+        auto key = label + 1;
+        auto c = g_tables.increment(t_beg, t_end, key);
         if (c > my_max_count) {
             my_max_key = key;
             my_max_count = c;
@@ -79,9 +83,28 @@ __global__ void update_lockfree
                 my_max_count = s_max_counts[i];
             }
         }
+
         if (labels[v + v_offset] != my_max_key - 1) {
             atomicAdd(counter, 1);
             labels[v + v_offset] = my_max_key - 1;
+        }
+    }
+}
+
+
+template<int NT>
+__global__ void update_random
+(int *neighbors, int *offsets, int *labels, GlobalHT g_tables, int *counter, int v_offset=0)
+{
+    int v = blockIdx.x;
+    if (threadIdx.x == 0) {
+        auto h = hash(v + v_offset);
+        int degree = offsets[v + 1] - offsets[v];
+        int i = offsets[v] + (h % degree);
+        auto label = labels[neighbors[i]];
+        if (labels[v + v_offset] != label) {
+            atomicAdd(counter, 1);
+            labels[v + v_offset] = label;
         }
     }
 }
