@@ -6,9 +6,12 @@
 #include "../common/segmented_reduce.cuh"
 #include "kernel.cuh"
 
+#include <cuda_profiler_api.h>
+
 #include "moderngpu.cuh"
 #include "kernels/segmentedsort.cuh"
 
+#include "segmented_sort.cuh"
 
 // Data-parallel primitives based label propagation
 template<typename V, typename E>
@@ -51,6 +54,7 @@ protected:
 
     mgpu::ContextPtr context;  // Used for segmented sort and scan
     SegmentedReducer *reducer;
+    SegmentedSorter *sorter;
 
     bool no_adj_labels_buf; // Don't allocate d_adj_labels if true
 };
@@ -69,15 +73,7 @@ std::pair<double, double> DPPBase<V, E>::run(int niter)
     const int nthreads = 128;
     const int n_blocks = divup(n, nthreads);
 
-    if (no_adj_labels_buf) {
-        V *h_neighbors;
-        E *h_offsets;
-        cudaHostGetDevicePointer((void **) &h_neighbors, (void *) &G->neighbors[0], 0);
-        cudaHostGetDevicePointer((void **) &h_offsets, (void *) &G->offsets[0], 0);
-        initialize_labels_2<<<n_blocks, nthreads>>>(d_labels, n, h_neighbors, h_offsets);
-    } else {
-        initialize_labels_2<<<n_blocks, nthreads>>>(d_labels, n, d_neighbors, d_offsets);
-    }
+    initialize_labels<<<n_blocks, nthreads>>>(d_labels, n);
 
     t1.start();
     // Main loop
@@ -105,7 +101,6 @@ std::pair<double, double> DPPBase<V, E>::run(int niter)
     return std::make_pair(t1.elapsed_time(), t2.elapsed_time());
 }
 
-
 template<typename V, typename E>
 void DPPBase<V, E>::perform_lp(int n, int m, int lbl_offset, int *pinned_hmem, cudaStream_t stream)
 {
@@ -115,7 +110,7 @@ void DPPBase<V, E>::perform_lp(int n, int m, int lbl_offset, int *pinned_hmem, c
 
     gather_labels<<<m_blocks, nthreads, 0, stream>>>(d_neighbors, d_labels, d_adj_labels, m);
 
-    mgpu::SegSortKeysFromIndices(d_adj_labels, m, d_offsets + 1, n - 1, *context);
+    sorter->run(d_adj_labels, m, d_offsets + 1, n - 1);
 
     find_segments<<<m_blocks, nthreads, 0, stream>>>(d_adj_labels, m, d_tmp1);
     set_boundary_case<<<n_blocks, nthreads, 0, stream>>>(d_offsets, n, d_tmp1);
@@ -174,6 +169,7 @@ void DPPBase<V, E>::init_gmem(V n, int m)
     cudaMalloc(&d_counter,        sizeof(int) * 1);
 
     reducer = new SegmentedReducer(m, context->Stream());
+    sorter = new SegmentedSorter(m, context);
 
     cudaMemset(d_counter, 0, sizeof(int));
 }
@@ -196,4 +192,5 @@ void DPPBase<V, E>::free_gmem()
     cudaFree(d_counter);
 
     delete reducer;
+    delete sorter;
 }
