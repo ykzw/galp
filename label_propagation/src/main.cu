@@ -131,17 +131,6 @@ int main(int argc, char *argv[])
     const Edge m = graph->m;
     std::cout << "Data is ready on the host (" << n << ", " << m << ")" << std::endl;
 
-    // int ma = 0;
-    // for (int i = 0; i < n; ++i) {
-    //     int d = graph->offsets[i + 1] - graph->offsets[i];
-    //     if (d > ma) {
-    //         ma = d;
-    //     }
-    // }
-    // std::cout << ma << std::endl;
-
-    // return 0;
-
     std::string proc_name;
     std::unique_ptr<Propagator> propagator;
     switch (method * 5 + policy) {
@@ -207,11 +196,16 @@ int main(int argc, char *argv[])
         check_gpu_mem(n, m, ngpus);
         propagator = make_unique<MultiInCoreLP<Vertex, Edge>>(graph, ngpus, lfht_policy);
         break;
+
+    default:
+        buffer_pow = 0;
+        proc_name = "serial\t ";
+        propagator = make_unique<LabelPropagator<Vertex, Edge>>(graph);
     }
     std::cout << "----------" << proc_name << "----------" << std::endl;
     std::pair<double, double> result = propagator->run(niter);
 
-    // for (auto i: range(100)) {
+    // for (auto i: range(300)) {
     //     printf("%d, %d\n", i, propagator->labels[i]);
     // }
 
