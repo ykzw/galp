@@ -3,4 +3,4 @@
 	url = https://github.com/moderngpu/moderngpu
 [submodule "cub"]
 	path = cub
-	url = git@github.com:ykzw/cub
+	url = https://github.com/ykzw/cub
