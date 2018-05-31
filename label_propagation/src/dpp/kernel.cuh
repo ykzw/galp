@@ -39,14 +39,14 @@ __global__ void gather_labels(const V *neighbors, const V *labels, V *dst, E m)
 
 // Create a flag array to indicate the index where the labels change
 template<typename V, typename E>
-__global__ void find_segments(V *adj_labels, E m, int *segments)
+__global__ void find_boundaries(V *adj_labels, E m, int *flags)
 {
     int gid = get_gid();
     if (gid < m - 1) {
         if (adj_labels[gid] != adj_labels[gid + 1]) {
-            segments[gid] = 1u;
+            flags[gid] = 1;
         } else {
-            segments[gid] = 0u;
+            flags[gid] = 0;
         }
     }
 }
@@ -54,47 +54,47 @@ __global__ void find_segments(V *adj_labels, E m, int *segments)
 
 // Complement the flag array for boundary cases
 template<typename V, typename E>
-__global__ void set_boundary_case(E *offsets, V n, int *segments)
+__global__ void set_boundary_case(E *offsets, V n, int *flags)
 {
     int gid = get_gid();
     if (gid < n) {
-        segments[offsets[gid + 1] - 1] = 1u;
+        flags[offsets[gid + 1] - 1] = 1;
     }
 }
 
 
 template<typename V, typename E>
-__global__ void scatter_indexes(V *adj_labels, E *offsets, V n, E m, int *segments, int *seg_offsets)
+__global__ void scatter_indexes(int *flags, E *offsets, V n, E m, int *boundaries, int *boundary_offsets)
 {
     int gid = get_gid();
     if (gid < m) {
-        if (adj_labels[gid] != adj_labels[gid + 1]) {
-            seg_offsets[adj_labels[gid]] = gid + 1;
+        if (flags[gid] != flags[gid + 1]) {
+            boundaries[flags[gid]] = gid;
         }
     }
 
     if (gid < n) {
         if (gid == 0) {
-            segments[-1] = 0;
+            boundary_offsets[-1] = 0;
         }
-        segments[gid] = adj_labels[offsets[gid + 1]];
+        boundary_offsets[gid] = flags[offsets[gid + 1]];
     }
 }
 
 
 __global__ void compute_label_weights
-(int *segments, int *limitp, int *label_weights)
+(int *boundaries, int *limitp, int *label_weights)
 {
     int limit = limitp[0];
     for (auto t: grid_stride_range(limit)) {
-        label_weights[t] = t == 0 ? segments[t] : segments[t] - segments[t - 1];
+        label_weights[t] = t == 0 ? boundaries[t] + 1 : boundaries[t] - boundaries[t - 1];
     }
 }
 
 
 template<typename V>
 __global__ void update_labels
-(int *adj_labels, int *segments, int *label_index, V n, int *labels, int *counter)
+(int *adj_labels, int *boundaries, int *label_index, V n, int *labels, int *counter)
 {
     int gid = get_gid();
     __shared__ int s_count;
@@ -105,8 +105,8 @@ __global__ void update_labels
 
     if (gid < n) {
         int i = label_index[gid];
-        int b = segments[i];
-        int lbl = adj_labels[b - 1];
+        int b = boundaries[i];
+        int lbl = adj_labels[b];
         if (lbl != labels[gid]) {
             atomicAdd(&s_count, 1);
         }

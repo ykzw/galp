@@ -41,16 +41,16 @@ protected:
     void free_gmem();
 
     // GPU memory
-    int *d_neighbors;      // m
-    int *d_offsets;        // n + 1
-    int *d_labels;         // n
-    int *d_adj_labels;     // m
-    int *d_tmp1;           // m + 1
-    int *d_tmp2;           // m + 1
-    int *d_segments;       // n + 1
-    int *d_label_weights;  // m
-    int *d_tmp_labels;     // n
-    int *d_counter;        // 1
+    int *d_neighbors;          // m
+    int *d_offsets;            // n + 1
+    int *d_labels;             // n
+    int *d_adj_labels;         // m
+    int *d_tmp1;               // m + 1
+    int *d_boundaries;         // m + 1
+    int *d_boundary_offsets;   // n + 1
+    int *d_label_weights;      // m
+    int *d_tmp_labels;         // n
+    int *d_counter;            // 1
 
     mgpu::ContextPtr context;  // Used for segmented sort and scan
     SegmentedReducer *reducer;
@@ -112,29 +112,29 @@ void DPPBase<V, E>::perform_lp(int n, int m, int lbl_offset, int *pinned_hmem, c
 
     sorter->run(d_adj_labels, m, d_offsets + 1, n - 1);
 
-    find_segments<<<m_blocks, nthreads, 0, stream>>>(d_adj_labels, m, d_tmp1);
+    find_boundaries<<<m_blocks, nthreads, 0, stream>>>(d_adj_labels, m, d_tmp1);
     set_boundary_case<<<n_blocks, nthreads, 0, stream>>>(d_offsets, n, d_tmp1);
 
     mgpu::ScanExc(d_tmp1, m + 1, *context);
 
-    scatter_indexes<<<m_blocks, nthreads, 0, stream>>>(d_tmp1, d_offsets, n, m, d_segments + 1, d_tmp2);
+    scatter_indexes<<<m_blocks, nthreads, 0, stream>>>(d_tmp1, d_offsets, n, m, d_boundaries, d_boundary_offsets + 1);
 
     compute_label_weights<<<n_blocks, nthreads, 0, stream>>>
-        (d_tmp2, d_segments + n, d_label_weights);
+        (d_boundaries, d_boundary_offsets + n, d_label_weights);
 
     int N;
     if (pinned_hmem != nullptr) {
-        cudaMemcpyAsync(pinned_hmem, d_segments + n, sizeof(int), cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(pinned_hmem, d_boundary_offsets + n, sizeof(int), cudaMemcpyDeviceToHost, stream);
         cudaStreamSynchronize(stream);
         N = *pinned_hmem;
     } else {
-        cudaMemcpy(&N, d_segments + n, sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&N, d_boundary_offsets + n, sizeof(int), cudaMemcpyDeviceToHost);
     }
 
-    reducer->apply(d_label_weights, N, d_segments, n, d_tmp1, d_tmp_labels);
+    reducer->apply(d_label_weights, N, d_boundary_offsets, n, d_tmp1, d_tmp_labels);
 
     update_labels<<<n_blocks, nthreads, 0, stream>>>
-        (d_adj_labels, d_tmp2, d_tmp_labels, n, d_labels + lbl_offset, d_counter);
+        (d_adj_labels, d_boundaries, d_tmp_labels, n, d_labels + lbl_offset, d_counter);
 }
 
 
@@ -161,12 +161,12 @@ void DPPBase<V, E>::init_gmem(V n, int m)
     } else {
         d_adj_labels = d_neighbors;
     }
-    cudaMalloc(&d_tmp1,           sizeof(int) * (m + 1));
-    cudaMalloc(&d_tmp2,           sizeof(int) * (m + 1));
-    cudaMalloc(&d_segments,       sizeof(int) * (n + 1));
-    cudaMalloc(&d_label_weights,  sizeof(int) * m);
-    cudaMalloc(&d_tmp_labels,     sizeof(int) * n);
-    cudaMalloc(&d_counter,        sizeof(int) * 1);
+    cudaMalloc(&d_tmp1,             sizeof(int) * (m + 1));
+    cudaMalloc(&d_boundaries,       sizeof(int) * (m + 1));
+    cudaMalloc(&d_boundary_offsets, sizeof(int) * (n + 1));
+    cudaMalloc(&d_label_weights,    sizeof(int) * m);
+    cudaMalloc(&d_tmp_labels,       sizeof(int) * n);
+    cudaMalloc(&d_counter,          sizeof(int) * 1);
 
     reducer = new SegmentedReducer(m, context->Stream());
     sorter = new SegmentedSorter(m, context);
@@ -185,8 +185,8 @@ void DPPBase<V, E>::free_gmem()
         cudaFree(d_adj_labels);
     }
     cudaFree(d_tmp1);
-    cudaFree(d_tmp2);
-    cudaFree(d_segments);
+    cudaFree(d_boundaries);
+    cudaFree(d_boundary_offsets);
     cudaFree(d_label_weights);
     cudaFree(d_tmp_labels);
     cudaFree(d_counter);

@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <unistd.h>
 
+#include <cuda_profiler_api.h>
+
 #include "myutil.h"
 #include "graph.h"
 
@@ -17,7 +19,7 @@
 
 #include "lfht/variants.cuh"
 
-#include "../nmi.h"
+#include "accuracy.h"
 
 
 void usage(char *prog)
@@ -52,10 +54,11 @@ void check_gpu_mem(V n, E m, int ngpus)
     // Check whether the GPU memory is enough.
     size_t free, total;
     cudaMemGetInfo(&free, &total);
-    if (free < sizeof(int) * (3 * m / ngpus + 2 * n)) {
+    size_t need = sizeof(int) * ((n + 3.2 * m) / ngpus + n);
+    if (free < need) {
         std::cout << "Not enough GPU memory!!" << std::endl
                   << "  GPU memory: " << free / 1024.0 / 1024 / 1024 << " GB" << std::endl
-                  << "    Required: " << sizeof(int) * (3.0 * m / ngpus + 2 * n) / 1024 / 1024 / 1024 << " GB" << std::endl;
+                  << "    Required: " << need / 1024.0 / 1024 / 1024 << " GB" << std::endl;
         exit(1);
     }
 }
@@ -203,7 +206,9 @@ int main(int argc, char *argv[])
         propagator = make_unique<LabelPropagator<Vertex, Edge>>(graph);
     }
     std::cout << "----------" << proc_name << "----------" << std::endl;
+    cudaProfilerStart();
     std::pair<double, double> result = propagator->run(niter);
+    cudaProfilerStop();
 
     // for (auto i: range(300)) {
     //     printf("%d, %d\n", i, propagator->labels[i]);

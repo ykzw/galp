@@ -2,7 +2,7 @@ INCLUDE = -I include -I ../moderngpu/include -I ../cub
 CCFLAGS = $(INCLUDE) -O3 -std=c++0x
 GPUARCH = -gencode arch=compute_60,code=sm_60
 CUFLAGS = $(INCLUDE) -O3 -std=c++11 -use_fast_math $(GPUARCH) -Xptxas -v -Xcompiler -fopenmp $(LIBRARY) -lnccl -lineinfo
-TARGET = bin/label_propagation
+TARGET = bin/galp
 
 SOURCE = src/main.cu src/common/*.cuh src/dpp/*.cuh src/lfht/*.cuh include/*.h Makefile
 

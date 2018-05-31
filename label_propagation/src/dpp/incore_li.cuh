@@ -71,16 +71,16 @@ int InCoreLIDPP<V, E>::iterate(int i)
         m, n, this->d_offsets, this->d_offsets + 1
     );
 
-    find_segments<<<m_blocks, nthreads>>>(this->d_adj_labels, m, this->d_tmp1);
+    find_boundaries<<<m_blocks, nthreads>>>(this->d_adj_labels, m, this->d_tmp1);
     set_boundary_case<<<n_blocks, nthreads>>>(this->d_offsets, n, this->d_tmp1);
 
     mgpu::ScanExc(this->d_tmp1, G->m + 1, *this->context);
 
-    scatter_indexes<<<m_blocks, nthreads>>>(this->d_tmp1, this->d_offsets, n, m, this->d_segments + 1, this->d_tmp2);
+    scatter_indexes<<<m_blocks, nthreads>>>(this->d_tmp1, this->d_offsets, n, m, this->d_boundaries, this->d_boundary_offsets + 1);
 
     // *Load imbalanced*
     compute_max_labels<<<n_blocks, nthreads>>>
-        (this->d_segments + 1, this->d_tmp2, this->d_adj_labels, this->d_labels, n, this->d_counter);
+        (this->d_boundary_offsets + 1, this->d_boundaries, this->d_adj_labels, this->d_labels, n, this->d_counter);
 
     int count = this->get_count();
     return count;
