@@ -1,1 +1,1 @@
-GPU-acceleration label propagation for graph clustering
+GPU-accelerated label propagation for graph clustering
