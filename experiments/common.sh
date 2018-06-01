@@ -8,7 +8,7 @@ repeat=5
 mkdir -p output
 result=output/result_p100.csv
 
-program=../label_propagation/bin/label_propagation
+program=../label_propagation/bin/galp
 impls=(dpp-wop dpp-no dpp-o dpp-h dpp-li lfht-wop lfht-no lfht-o lfht-h mg-ooc mg-ic)
 
 data_path=../datasets
