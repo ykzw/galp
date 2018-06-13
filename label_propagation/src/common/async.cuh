@@ -9,11 +9,8 @@
 template<typename V, typename E, typename S>
 class MultiAsyncLP;
 
-// template<typename V, typename E, typename S>
-// class MultiInCoreLP;
 
-
-// GPU out-of-core with overlap, data-parallel primitives based label propagation
+// GPU out-of-core with overlap
 template<typename V, typename E, typename S>
 class AsyncLP: public S, public OutOfCore<V, E> {
 public:
@@ -28,7 +25,6 @@ public:
     virtual ~AsyncLP() = default;
 
     friend MultiAsyncLP<V, E, AsyncLP<V, E, S>>;
-    // friend MultiInCoreLP<V, E, AsyncLP<V, E, S>>;
 
 private:
     // Methods
@@ -98,7 +94,6 @@ void AsyncLP<V, E, S>::postprocess()
 {
     free_gmem();
 
-    // cudaStreamDestroy(stream1);
     cudaStreamDestroy(stream2);
 }
 

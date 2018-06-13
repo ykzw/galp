@@ -146,8 +146,6 @@ void MultiInCoreLP<V, E>::preprocess()
 
     comms = (ncclComm_t *) malloc(sizeof(ncclComm_t) * ngpus);
 
-    // ncclUniqueId id;
-    // ncclGetUniqueId(&id);
     ncclCommInitAll(comms, ngpus, nullptr);
 
     scale_factor = 1.1;
@@ -155,8 +153,6 @@ void MultiInCoreLP<V, E>::preprocess()
     #pragma omp parallel for num_threads(ngpus)
     for (int i = 0; i < ngpus; ++i) {
         cudaSetDevice(i);
-
-        // ncclCommInitRank(&comms[i], ngpus, id, i);
 
         int bn = gpu_boundaries[i + 1] - gpu_boundaries[i];
         int bm = G->offsets[gpu_boundaries[i + 1]] - G->offsets[gpu_boundaries[i]];

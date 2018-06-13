@@ -6,7 +6,7 @@
 #include "label_propagator.h"
 
 
-// GPU in-core, lock-free hash table based label propagation
+// GPU in-core
 template<typename V, typename E, typename S>
 class InCoreLP: public S {
 public:

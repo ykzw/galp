@@ -12,7 +12,6 @@
 
 
 template<typename V, typename E, typename S>
-// class MultiAsyncLP: public LabelPropagator<V, E>, public OutOfCore<V, E> {
 class MultiAsyncLP: public LabelPropagator<V, E> {
 public:
     using typename LabelPropagator<V, E>::GraphT;
@@ -119,15 +118,11 @@ void MultiAsyncLP<V, E, S>::preprocess()
 
     comms = (ncclComm_t *) malloc(sizeof(ncclComm_t) * ngpus);
 
-    // ncclUniqueId id;
-    // ncclGetUniqueId(&id);
     ncclCommInitAll(comms, ngpus, nullptr);
 
     #pragma omp parallel for num_threads(ngpus)
     for (int i = 0; i < ngpus; ++i) {
         cudaSetDevice(i);
-
-        // ncclCommInitRank(&comms[i], ngpus, id, i);
 
         #pragma omp critical
         if (policy >= 0) {

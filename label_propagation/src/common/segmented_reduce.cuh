@@ -2,6 +2,7 @@
 
 #pragma once
 
+// Modified segmented reduce based on ModernGPU
 
 template<typename T>
 __device__ int binary_search(T key, T *data, int n)
@@ -102,11 +103,6 @@ __global__ void segmented_reduce
 
         int my_offset = tile_offset + ET * threadIdx.x;
         int seg = binary_search(my_offset, shared, nsegs) - 1;
-
-        // if (threadIdx.x == 46 && blockIdx.x == 9)
-        //     printf("%d, %d, %d, %d, %d\n", ptr[seg_begin], ptr[seg_begin + 1],
-        //            ptr[seg_begin + 2], ptr[seg_begin + 3]);
-        //     // printf("%d, %d, %d, %d, %d\n", my_offset, seg_begin, seg_end, nsegs);
 
         int cur_offset = shared[seg];
         int next_offset = (seg + 1 < nsegs) ? shared[seg + 1] : end;

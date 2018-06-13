@@ -8,9 +8,6 @@
 #include "kernel.cuh"
 #include "../common/segmented_reduce.cuh"
 
-template<typename V, typename E, typename S>
-class MultiAsyncLP;
-
 
 template<typename V, typename E>
 class LFHTBase: public LabelPropagator<V, E> {

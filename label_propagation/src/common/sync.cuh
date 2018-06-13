@@ -6,6 +6,7 @@
 #include "outofcore.cuh"
 
 
+// GPU out-of-core without overlap
 template<typename V, typename E, typename S>
 class SyncLP: public S, public OutOfCore<V, E> {
 public:

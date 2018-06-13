@@ -15,7 +15,7 @@ using TaskQueue = std::deque<Task>;
 using TaskQueueList = std::vector<TaskQueue>;
 
 
-// CPU--GPU hybrid, GPU out-of-core with overlap, data-parallel primitives based label propagation
+// CPU--GPU hybrid, GPU out-of-core with overlap
 template<typename V, typename E, typename S>
 class HybridLP: public S, public OutOfCore<V, E> {
 public:
