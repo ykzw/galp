@@ -81,7 +81,7 @@ datasets) by using `utils/normalize.py`.
 
 #### Binary
 
-The binary formst is a list of pairs of 32-bit integers that denote edges, including edges of both
+The binary format is a list of pairs of 32-bit integers that denote edges, including edges of both
 directions in this case.  For example, the above sample is represented in binary as:
 ```
 0 1 0 2 1 0 ...
