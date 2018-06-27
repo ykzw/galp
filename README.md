@@ -20,7 +20,7 @@ according to the GPU's compute capability.
 
 You can run the program as follows:
 ```
-galp [options] method policy data [test_data]
+galp [options] method policy data [test]
 ```
 
 * `method`: specify the method to be used.
