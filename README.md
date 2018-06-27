@@ -32,7 +32,7 @@ galp [options] method policy data [test_data]
   * 1: out-of-core without overlap
   * 2: out-of-core with overlap
   * 3: CPU--GPU hybrid
-  * 4: depeneding on the method:
+  * 4: depened on the method:
     * method=0: Load-imbalanced in-core
     * method=1: Multi-GPU, out-of-core with overlap
   * 5: Multi-GPU incore (only for method 1)
@@ -58,8 +58,8 @@ galp [options] method policy data [test_data]
 ### Graph formats
 
 Basically, the program can handle two kinds of formats: text (`.txt` files) and binary (`.bin`
-files).  The text format is probably easier to prepare but slower to load.  The binary format can be
-loaded much faster.
+files).  The text format is probably easier to prepare, but the data loading is slow.  The binary
+format can be loaded much faster.
 
 #### Text
 
@@ -76,16 +76,16 @@ Several assumptions of the text format is the following:
 * Edges exist only for vertices i and j such that i < j.
 
 You can "normalize" an edge-list data (e.g., the [SNAP](https://snap.stanford.edu/data/index.html)
-datasets ) by using `utils/normalize.py`.
+datasets) by using `utils/normalize.py`.
 
 
 #### Binary
 
-The binary formst is a list of pairs of 32-bit integers that denote edges, including edges of both directions.
-For example, the above sample is represented in binary as:
+The binary formst is a list of pairs of 32-bit integers that denote edges, including edges of both
+directions in this case.  For example, the above sample is represented in binary as:
 ```
 0 1 0 2 1 0 ...
 ```
-You can generate this format by using `utils/edgelist2bin.cpp`.
-Since this program also does the "normalization,"
-you can directly apply it to the SNAP dataset (e.g., `./edgelist2bin com-friendster.ungraph.txt`).
+You can generate this format by using `utils/edgelist2bin.cpp`.  Since this program also
+does the "normalization," you can directly apply it to the SNAP dataset (e.g., `./edgelist2bin
+com-friendster.ungraph.txt`).
