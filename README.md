@@ -33,25 +33,25 @@ galp [options] method policy data [test]
   * 2: out-of-core with overlap
   * 3: CPU--GPU hybrid
   * 4: depened on the method:
-    * method=0: Load-imbalanced in-core
-    * method=1: Multi-GPU, out-of-core with overlap
-  * 5: Multi-GPU incore (only for method 1)
+    * method=0: load-imbalanced in-core
+    * method=1: multi-GPU, out-of-core with overlap
+  * 5: multi-GPU incore (only for method 1)
 
 * `data`: the graph data file.
-  * The available graph format is described below.
+  * The available graph formats are described below.
 
 * `test`: the ground-truth file.
   * Some accuracy measures are computed if supplied.
 
 ### Options
 
-* `-b n`: Set the buffer size to 2^n.
+* `-b n`: set the buffer size to 2^n.
   * The default is 24.
 
-* `-i n`: Set the number of iterations.
+* `-i n`: set the number of iterations.
   * The default is 10.
 
-* `-g n`: Set the number of GPUs.
+* `-g n`: set the number of GPUs.
   * The default is 1.
 
 
